@@ -1,9 +1,35 @@
 const std = @import("std");
 const root = @import("./root.zig");
 
+const HELP_MESSAGE =
+    \\noice - one-time pad encryption CLI tool
+    \\noice [OPTIONS] <file>
+    \\
+    \\[OPTIONS]:
+    \\
+    \\-c                            | set work mode to cipher
+    \\-d                            | set work mode to decipher
+    \\-g                            | set work mode to token generation
+    \\-t=<token file>               | set token file to use
+    \\-C                            | cipher & generate token
+    \\
+    \\Reminder:
+    \\
+    \\OTP is an unhackable method of encryption as long as the following rules are followed:
+    \\  - The token is fully random.
+    \\  - The token stays secret from any third parties.
+    \\
+    \\ Obviously, the effectiveness of this method is proportional to your ability to store your tokens safely.
+    \\
+    \\ ---
+    \\
+    \\May god be with you,
+    \\ DF.
+    \\
+;
+
 pub fn main() !void {
     const stdout = std.io.getStdOut().writer();
-    try stdout.print("Copyright 2024 Daniel Falkov, all rights reserved.\n", .{});
 
     const allocator = std.heap.page_allocator;
 
@@ -31,7 +57,12 @@ pub fn main() !void {
                                 token_file = arg[3..];
                                 break;
                             },
-                            // TODO: Add help display.
+                            'h' => {
+                                try stdout.print("{s}", .{HELP_MESSAGE});
+                                return;
+                            },
+                            // TODO: Add -g flag support.
+                            // TODO: Add -C flag support.
                             else => {
                                 try stdout.print("Error: Unknown flag: {c}\n", .{chr});
                                 return;
