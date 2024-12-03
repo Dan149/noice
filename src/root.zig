@@ -2,7 +2,7 @@ const std = @import("std");
 const testing = std.testing;
 
 pub fn cipherBuffer(buffer: []const u8, token: []const u8, allocator: std.mem.Allocator) ![]const u9 {
-    var buf_out: []u9 = try allocator.alloc(u9, buffer.len);
+    const buf_out: []u9 = try allocator.alloc(u9, buffer.len);
 
     for (buffer, 0..) |chr, i| {
         buf_out[i] = @as(u9, chr) + @as(u9, token[i]);
@@ -12,11 +12,17 @@ pub fn cipherBuffer(buffer: []const u8, token: []const u8, allocator: std.mem.Al
 }
 
 pub fn decipherBuffer(buffer: []const u9, token: []const u8, allocator: std.mem.Allocator) ![]const u8 {
-    var buf_out: []u8 = try allocator.alloc(u8, buffer.len);
+    const buf_out: []u8 = try allocator.alloc(u8, buffer.len);
 
     for (buffer, 0..) |chr, i| {
         buf_out[i] = @intCast(chr - token[i]);
     }
+    return buf_out;
+}
+
+pub fn generateToken(token_size: usize, allocator: std.mem.Allocator) ![]const u8 {
+    const buf_out: []u8 = try allocator.alloc(u8, token_size);
+    std.crypto.random.bytes(buf_out);
     return buf_out;
 }
 

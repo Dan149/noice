@@ -34,7 +34,7 @@ pub fn main() !void {
     const allocator = std.heap.page_allocator;
 
     var args: std.process.ArgIterator = std.process.args();
-    var workMode: ?WorkModes = null;
+    var work_mode: ?work_modes = null;
     var in_file: ?[]const u8 = null;
     var token_file: ?[]const u8 = null;
     _ = args.next();
@@ -51,17 +51,17 @@ pub fn main() !void {
                 1 => {
                     if (flag) {
                         switch (chr) {
-                            'c' => workMode = .cipher,
-                            'd' => workMode = .decipher,
+                            'c' => work_mode = .cipher,
+                            'd' => work_mode = .decipher,
                             't' => {
                                 token_file = arg[3..];
                                 break;
                             },
+                            'g' => work_mode = .generate_token,
                             'h' => {
                                 try stdout.print("{s}", .{HELP_MESSAGE});
                                 return;
                             },
-                            // TODO: Add -g flag support.
                             // TODO: Add -C flag support.
                             else => {
                                 try stdout.print("Error: Unknown flag: {c}\n", .{chr});
@@ -99,15 +99,16 @@ pub fn main() !void {
         token = readFile(filename, allocator) catch {
             @panic("Error: Failed to read token file.\n");
         };
-    } else {
-        @panic("Error: No token file specified (-t=<filename>).\n");
+    } else if (work_mode != .generate_token) {
+        try stdout.print("Error: No token file specified\n", .{});
+        return;
     }
 
-    if (file_content.len != token.len and workMode == .cipher) {
+    if (file_content.len != token.len and work_mode == .cipher) {
         @panic("Error: Token is not the same size as input file.\n");
     }
 
-    if (workMode) |mode| {
+    if (work_mode) |mode| {
         switch (mode) {
             .cipher => {
                 try stdout.print("Starting file ciphering...\n", .{});
@@ -137,9 +138,20 @@ pub fn main() !void {
                 const d_buf = try root.decipherBuffer(decoded_arr.items, token, allocator);
                 defer allocator.free(d_buf);
                 decoded_arr.deinit();
+                // TODO: set time-based file names.
                 const of = try std.fs.cwd().createFile("decoded_data.otpraw", .{});
                 defer of.close();
                 try of.writeAll(d_buf);
+                try stdout.print("Done!\n", .{});
+            },
+            .generate_token => {
+                try stdout.print("Starting token generation...\n", .{});
+                const new_token = try root.generateToken(file_content.len, allocator);
+                defer allocator.free(new_token);
+                // TODO: set time-based file names.
+                const of = try std.fs.cwd().createFile("token.otptok", .{});
+                defer of.close();
+                try of.writeAll(new_token);
                 try stdout.print("Done!\n", .{});
             },
         }
@@ -152,4 +164,4 @@ fn readFile(filename: []const u8, allocator: std.mem.Allocator) ![]u8 {
     return std.fs.cwd().readFileAlloc(allocator, filename, 1_000_000_000);
 }
 
-const WorkModes = enum { cipher, decipher };
+const work_modes = enum { cipher, decipher, generate_token };

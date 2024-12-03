@@ -3,3 +3,4 @@ zig-out
 *.txt
 *.otpenc
 *.otpraw
+*.otptok
