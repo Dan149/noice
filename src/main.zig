@@ -1,5 +1,6 @@
 const std = @import("std");
 const root = @import("./root.zig");
+const zarginator = @import("zarginator");
 
 const HELP_MESSAGE =
     \\noice - one-time pad encryption CLI tool
@@ -30,56 +31,50 @@ const HELP_MESSAGE =
 
 pub fn main() !void {
     const stdout = std.io.getStdOut().writer();
+    const eql = std.mem.eql;
 
     const allocator = std.heap.page_allocator;
+    const args = try zarginator.Args.init(allocator);
 
-    var args: std.process.ArgIterator = std.process.args();
     var work_mode: ?work_modes = null;
     var in_file: ?[]const u8 = null;
     var token_file: ?[]const u8 = null;
-    _ = args.next();
 
-    while (args.next()) |arg| {
-        var flag: bool = false;
-        for (arg, 0..) |chr, i| {
-            switch (i) {
-                0 => {
-                    if (chr == '-') {
-                        flag = true;
-                    }
-                },
-                1 => {
-                    if (flag) {
-                        switch (chr) {
-                            'c' => work_mode = .cipher,
-                            'd' => work_mode = .decipher,
-                            't' => {
-                                token_file = arg[3..];
-                                break;
-                            },
-                            'g' => work_mode = .generate_token,
-                            'h' => {
-                                try stdout.print("{s}", .{HELP_MESSAGE});
-                                return;
-                            },
-                            // TODO: Add -C flag support.
-                            else => {
-                                try stdout.print("Error: Unknown flag: {c}\n", .{chr});
-                                return;
-                            },
-                        }
-                    }
-                },
-                else => {
-                    if (flag) {
-                        try stdout.print("noice [OPTIONS] <in_file>\n", .{});
-                        return;
-                    }
-                },
+    if (args.args.len == 0 and args.flags.len == 0) {
+        return;
+    }
+
+    for (args.flags) |f| {
+        if (eql(u8, f.flag, "-d")) {
+            work_mode = .decipher;
+        } else if (eql(u8, f.flag, "-c")) {
+            work_mode = .cipher;
+        } else if (eql(u8, f.flag, "-g")) {
+            work_mode = .generate_token;
+        } else if (eql(u8, f.flag, "-t")) {
+            if (f.value) |v| {
+                token_file = v;
+            } else {
+                try stdout.print("Error: No token file specified after -t flag.\n", .{});
             }
+        } else if (eql(u8, f.flag, "-h")) {
+            try stdout.print("{s}", .{HELP_MESSAGE});
+        } else {
+            try stdout.print("Error: invalid flag: {s}, type 'noice -h' for help.\n", .{f.flag});
+            return;
         }
-        if (!flag) {
-            in_file = arg;
+    }
+    if (args.args.len > 0) {
+        if (args.args.len != 1) {
+            try stdout.print("Error: Too many arguments.\n", .{});
+            return;
+        }
+        in_file = args.args[0];
+    } else {
+        if (args.flags[args.flags.len - 1].value) |v| {
+            in_file = v;
+        } else {
+            try stdout.print("Error: input file not provided.\n", .{});
         }
     }
 
@@ -89,15 +84,18 @@ pub fn main() !void {
 
     if (in_file) |filename| {
         file_content = readFile(filename, allocator) catch {
-            @panic("Error: Failed to read input file.\n");
+            try stdout.print("Error: Failed to read input file.\n", .{});
+            return;
         };
     } else {
-        @panic("Error: No input file specified.\n");
+        try stdout.print("Error: No input file specified.\n", .{});
+        return;
     }
 
     if (token_file) |filename| {
         token = readFile(filename, allocator) catch {
-            @panic("Error: Failed to read token file.\n");
+            try stdout.print("Error: Failed to read token file.\n", .{});
+            return;
         };
     } else if (work_mode != .generate_token) {
         try stdout.print("Error: No token file specified\n", .{});
@@ -105,7 +103,8 @@ pub fn main() !void {
     }
 
     if (file_content.len != token.len and work_mode == .cipher) {
-        @panic("Error: Token is not the same size as input file.\n");
+        try stdout.print("Error: Token is not the same size as input file.\n", .{});
+        return;
     }
 
     if (work_mode) |mode| {
